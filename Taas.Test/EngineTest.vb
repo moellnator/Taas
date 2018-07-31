@@ -41,6 +41,20 @@
         Debug.Assert(e.Tasks.First.State = TaskState.Disposed)
     End Sub
 
+    <TestMethod()> Public Sub MockSystem_Pause()
+        Dim e As New TestEngine
+        Using t As New MockTask
+            t.Initialize(e)
+            t.Execute()
+            t.Pause()
+            Debug.Assert(e.Tasks.First.State = TaskState.Paused)
+            t.Execute()
+            AwaitTask(t, 1000)
+            Debug.Assert(e.Tasks.First.State = TaskState.Finished)
+        End Using
+        Debug.Assert(e.Tasks.First.State = TaskState.Disposed)
+    End Sub
+
     Private Sub AwaitTask(task As Task, timeOut As Double)
         Dim stopWatch As New Stopwatch
         stopWatch.Start()
