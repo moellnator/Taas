@@ -6,14 +6,14 @@
         Dim e As New TestEngine
         Using t As New MockTask
             t.Initialize(e)
-            Debug.Assert(e.Tasks.Count = 1)
-            Debug.Assert(e.Tasks.First.State = TaskState.Initialized)
+            Assert.AreEqual(e.Tasks.Count, 1)
+            Assert.AreEqual(e.Tasks.First.State, TaskState.Initialized)
             t.Execute()
-            Debug.Assert(e.Tasks.First.State = TaskState.Running)
+            Assert.AreEqual(e.Tasks.First.State, TaskState.Running)
             AwaitTask(t, 1000)
-            Debug.Assert(e.Tasks.First.State = TaskState.Finished)
+            Assert.AreEqual(e.Tasks.First.State, TaskState.Finished)
         End Using
-        Debug.Assert(e.Tasks.First.State = TaskState.Disposed)
+        Assert.AreEqual(e.Tasks.First.State, TaskState.Disposed)
     End Sub
 
     <TestMethod()> Public Sub MockSystem_Fail()
@@ -23,10 +23,10 @@
             t.Execute()
             t.Fail()
             AwaitTask(t, 1000)
-            Debug.Assert(e.Tasks.First.State = TaskState.Failed)
-            Debug.Assert(e.LastError.Message = "Task failed.")
+            Assert.AreEqual(e.Tasks.First.State, TaskState.Failed)
+            Assert.AreEqual(e.LastError.Message, "Task failed.")
         End Using
-        Debug.Assert(e.Tasks.First.State = TaskState.Disposed)
+        Assert.AreEqual(e.Tasks.First.State, TaskState.Disposed)
     End Sub
 
     <TestMethod()> Public Sub MockSystem_Abort()
@@ -36,9 +36,9 @@
             t.Execute()
             t.Abort()
             AwaitTask(t, 1000)
-            Debug.Assert(e.Tasks.First.State = TaskState.Aborted)
+            Assert.AreEqual(e.Tasks.First.State, TaskState.Aborted)
         End Using
-        Debug.Assert(e.Tasks.First.State = TaskState.Disposed)
+        Assert.AreEqual(e.Tasks.First.State, TaskState.Disposed)
     End Sub
 
     <TestMethod()> Public Sub MockSystem_Pause()
@@ -47,12 +47,12 @@
             t.Initialize(e)
             t.Execute()
             t.Pause()
-            Debug.Assert(e.Tasks.First.State = TaskState.Paused)
+            Assert.AreEqual(e.Tasks.First.State, TaskState.Paused)
             t.Execute()
             AwaitTask(t, 1000)
-            Debug.Assert(e.Tasks.First.State = TaskState.Finished)
+            Assert.AreEqual(e.Tasks.First.State, TaskState.Finished)
         End Using
-        Debug.Assert(e.Tasks.First.State = TaskState.Disposed)
+        Assert.AreEqual(e.Tasks.First.State, TaskState.Disposed)
     End Sub
 
     Private Sub AwaitTask(task As Task, timeOut As Double)
@@ -60,7 +60,7 @@
         stopWatch.Start()
         While task.State = TaskState.Running
             Threading.Thread.Sleep(1)
-            If stopWatch.ElapsedMilliseconds >= timeOut Then Throw New Exception("Waiting for task has timed out (" & stopWatch.ElapsedTicks & ").")
+            If stopWatch.ElapsedMilliseconds >= timeOut Then Assert.Fail("Waiting for task has timed out (" & stopWatch.ElapsedTicks & ").")
         End While
         stopWatch.Stop()
     End Sub
@@ -70,6 +70,7 @@
         Private _should_fail As Boolean = False
 
         Protected Overrides Sub Runtime()
+            Trace.WriteLine("Task has been started.")
             Dim stopWatch As New Stopwatch
             stopWatch.Start()
             While stopWatch.ElapsedMilliseconds <= 100
@@ -77,10 +78,41 @@
                 If Me._should_fail Then Throw New Exception("Task failed.")
             End While
             stopWatch.Stop()
+            Trace.WriteLine("Task has been executed.")
         End Sub
 
         Public Sub Fail()
             Me._should_fail = True
+        End Sub
+
+        Protected Overrides Sub Setup()
+            MyBase.Setup()
+            Trace.WriteLine("Task has been setup.")
+        End Sub
+
+        Protected Overrides Sub CleanUp()
+            MyBase.CleanUp()
+            Trace.WriteLine("Task has been cleaned up.")
+        End Sub
+
+        Protected Overrides Sub CleanUpUnmanaged()
+            MyBase.CleanUp()
+            Trace.WriteLine("Task has been cleaned up (unmanaged ressource).")
+        End Sub
+
+        Protected Overrides Sub RuntimePause()
+            MyBase.RuntimePause()
+            Trace.WriteLine("Task has been paused.")
+        End Sub
+
+        Protected Overrides Sub RuntimeResume()
+            MyBase.RuntimeResume()
+            Trace.WriteLine("Task has been resumed.")
+        End Sub
+
+        Protected Overrides Sub RuntimeAbort()
+            MyBase.RuntimeAbort()
+            Trace.WriteLine("Task has been aborted.")
         End Sub
 
     End Class
