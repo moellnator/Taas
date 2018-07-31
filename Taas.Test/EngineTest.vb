@@ -2,7 +2,7 @@
 
 <TestClass()> Public Class EngineTest
 
-    <TestMethod()> Public Sub MockSystem_Execute()
+    <TestMethod(), TestCategory("MockUpTask")> Public Sub Execute()
         Dim e As New TestEngine
         Using t As New MockTask
             t.Initialize(e)
@@ -16,7 +16,7 @@
         Assert.AreEqual(e.Tasks.First.State, TaskState.Disposed)
     End Sub
 
-    <TestMethod()> Public Sub MockSystem_Fail()
+    <TestMethod(), TestCategory("MockUpTask")> Public Sub Fail()
         Dim e As New TestEngine
         Using t As New MockTask
             t.Initialize(e)
@@ -29,7 +29,7 @@
         Assert.AreEqual(e.Tasks.First.State, TaskState.Disposed)
     End Sub
 
-    <TestMethod()> Public Sub MockSystem_Abort()
+    <TestMethod(), TestCategory("MockUpTask")> Public Sub Abort()
         Dim e As New TestEngine
         Using t As New MockTask
             t.Initialize(e)
@@ -41,7 +41,7 @@
         Assert.AreEqual(e.Tasks.First.State, TaskState.Disposed)
     End Sub
 
-    <TestMethod()> Public Sub MockSystem_Pause()
+    <TestMethod(), TestCategory("MockUpTask")> Public Sub Pause()
         Dim e As New TestEngine
         Using t As New MockTask
             t.Initialize(e)
@@ -65,7 +65,25 @@
         stopWatch.Stop()
     End Sub
 
-    Public Class MockTask : Inherits Task
+    <TestMethod, TestCategory("TaskRepository")> Public Sub LoadTestAssemby()
+        Dim ctr As TaskRespository = TaskRespository.Common
+        ctr.Reset()
+        ctr.LoadFromAssembly("Taas.Test.dll")
+        Dim taskNames As IEnumerable(Of String) = ctr.GetListOfTaskNames
+        Assert.AreEqual(taskNames.Count, 1)
+        Assert.AreEqual(taskNames.First, "Taas.Test.dll:Taas.Test.EngineTest.MockTask")
+    End Sub
+
+    <TestMethod, TestCategory("TaskRepository")> Public Sub InstantiateMockTask()
+        Dim ctr As TaskRespository = TaskRespository.Common
+        ctr.Reset()
+        ctr.LoadFromAssembly("Taas.Test.dll")
+        Dim t As Task = ctr.Instanciate("Taas.Test.dll:Taas.Test.EngineTest.MockTask")
+        Assert.IsTrue(TypeOf t Is MockTask)
+    End Sub
+
+
+    <Task> Public Class MockTask : Inherits Task
 
         Private _should_fail As Boolean = False
 
@@ -117,7 +135,7 @@
 
     End Class
 
-    Public Class TestEngine : Inherits Engine
+    Public Class TestEngine : Inherits TaskEngine
 
         Private _tasks As New List(Of Task)
         Public ReadOnly Property Tasks As IReadOnlyList(Of Task)
