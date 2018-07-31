@@ -83,6 +83,7 @@
     <Compile Include="TaskAttribute.vb" />
     <Compile Include="TaskEvent.vb" />
     <Compile Include="TaskExceptionEvent.vb" />
+    <Compile Include="TaskOptions.vb" />
     <Compile Include="TaskRespository.vb" />
   </ItemGroup>
   <ItemGroup>

@@ -5,7 +5,7 @@
     <TestMethod(), TestCategory("MockUpTask")> Public Sub Execute()
         Dim e As New TestEngine
         Using t As New MockTask
-            t.Initialize(e)
+            t.Initialize(e, TaskOptions.Empty)
             Assert.AreEqual(e.Tasks.Count, 1)
             Assert.AreEqual(e.Tasks.First.State, TaskState.Initialized)
             t.Execute()
@@ -19,7 +19,7 @@
     <TestMethod(), TestCategory("MockUpTask")> Public Sub Fail()
         Dim e As New TestEngine
         Using t As New MockTask
-            t.Initialize(e)
+            t.Initialize(e, TaskOptions.Empty)
             t.Execute()
             t.Fail()
             AwaitTask(t, 1000)
@@ -32,7 +32,7 @@
     <TestMethod(), TestCategory("MockUpTask")> Public Sub Abort()
         Dim e As New TestEngine
         Using t As New MockTask
-            t.Initialize(e)
+            t.Initialize(e, TaskOptions.Empty)
             t.Execute()
             t.Abort()
             AwaitTask(t, 1000)
@@ -44,7 +44,7 @@
     <TestMethod(), TestCategory("MockUpTask")> Public Sub Pause()
         Dim e As New TestEngine
         Using t As New MockTask
-            t.Initialize(e)
+            t.Initialize(e, TaskOptions.Empty)
             t.Execute()
             t.Pause()
             Assert.AreEqual(e.Tasks.First.State, TaskState.Paused)

@@ -30,8 +30,9 @@ Public MustInherit Class Task : Implements IDisposable, IEquatable(Of Task)
     Private _is_disposed As Boolean
     Private _engine As TaskEngine
     Private _current_state As TaskState = TaskState.Invalid
-    Private _thread As New Threading.Thread(AddressOf Me._loop_internal)
-    Private _lock As New Threading.Semaphore(0, 1)
+    Private _options As TaskOptions = Nothing
+    Private ReadOnly _thread As New Threading.Thread(AddressOf Me._loop_internal)
+    Private ReadOnly _lock As New Threading.Semaphore(0, 1)
 
     Public Sub New()
         Me.ID = _ID_NEXT()
@@ -42,8 +43,9 @@ Public MustInherit Class Task : Implements IDisposable, IEquatable(Of Task)
         RaiseEvent StateChange(Me, New TaskEventArgs(newState))
     End Sub
 
-    Public Sub Initialize(engine As TaskEngine)
+    Public Sub Initialize(engine As TaskEngine, options As TaskOptions)
         Me._engine = engine
+        Me._options = options
         AddHandler Me.StateChange, AddressOf Me._engine.TaskEventSink
         Me.Setup()
         Me._change_state(TaskState.Initialized)
