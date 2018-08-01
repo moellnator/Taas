@@ -7,6 +7,8 @@ Project("{F184B08F-C81C-45F6-A57F-5ABD9991F28F}") = "Taas.BackEnd", "Taas\Taas.B
 EndProject
 Project("{F184B08F-C81C-45F6-A57F-5ABD9991F28F}") = "Taas.Test", "Taas.Test\Taas.Test.vbproj", "{05009C89-5B54-47CC-8EC3-3B3AE2CF4A59}"
 EndProject
+Project("{F184B08F-C81C-45F6-A57F-5ABD9991F28F}") = "Taas.HostProcess", "Taas.ProcessHost\Taas.HostProcess.vbproj", "{5333E521-E0FA-483A-8737-6D9280CF2200}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -21,6 +23,10 @@ Global
 		{05009C89-5B54-47CC-8EC3-3B3AE2CF4A59}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{05009C89-5B54-47CC-8EC3-3B3AE2CF4A59}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{05009C89-5B54-47CC-8EC3-3B3AE2CF4A59}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5333E521-E0FA-483A-8737-6D9280CF2200}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5333E521-E0FA-483A-8737-6D9280CF2200}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5333E521-E0FA-483A-8737-6D9280CF2200}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5333E521-E0FA-483A-8737-6D9280CF2200}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

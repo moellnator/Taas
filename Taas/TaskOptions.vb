@@ -1,12 +1,12 @@
 ﻿Public Class TaskOptions
 
-    Private Sub New()
-    End Sub
+    Public Property ExecuteWithoutShell As Boolean = True
+    Public ReadOnly Property Library As String
+    Public ReadOnly Property ClassName As String
 
-    Public Shared ReadOnly Property Empty As TaskOptions
-        Get
-            Return New TaskOptions
-        End Get
-    End Property
+    Public Sub New(libray As String, className As String)
+        Me.Library = libray
+        Me.ClassName = className
+    End Sub
 
 End Class

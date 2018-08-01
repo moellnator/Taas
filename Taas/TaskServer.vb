@@ -1,4 +1,6 @@
-﻿Public Enum TaskState
+﻿Imports Taas.BackEnd
+
+Public Enum TaskState
     Invalid = -1
     Initialized
     Disposed
@@ -9,7 +11,10 @@
     Aborted
 End Enum
 
-Public MustInherit Class Task : Implements IDisposable, IEquatable(Of Task)
+Public Class TaskServer : Implements IDisposable, IEquatable(Of TaskServer)
+
+    'TODO: Add finished handler
+    'TODO: Add process exception handler
 
     Private Shared _ID_GLOBAL As Integer = 0
     Private Shared Function _ID_NEXT() As Integer
@@ -31,6 +36,9 @@ Public MustInherit Class Task : Implements IDisposable, IEquatable(Of Task)
     Private _engine As TaskEngine
     Private _current_state As TaskState = TaskState.Invalid
     Private _options As TaskOptions = Nothing
+    Private WithEvents _pipe_handler As TaskPipe
+    Private _proc As Process
+    Private _is_killing As Boolean = False
     Private ReadOnly _thread As New Threading.Thread(AddressOf Me._loop_internal)
     Private ReadOnly _lock As New Threading.Semaphore(0, 1)
 
@@ -45,77 +53,94 @@ Public MustInherit Class Task : Implements IDisposable, IEquatable(Of Task)
 
     Public Sub Initialize(engine As TaskEngine, options As TaskOptions)
         Me._engine = engine
-        Me._options = options
         AddHandler Me.StateChange, AddressOf Me._engine.TaskEventSink
-        Me.Setup()
-        Me._change_state(TaskState.Initialized)
-    End Sub
-
-    Protected Overridable Sub Setup()
+        Me._options = options
+        Dim pipeName As String = IO.Path.GetRandomFileName()
+        Me._pipe_handler = New TaskPipe(
+            New IO.Pipes.NamedPipeServerStream(pipeName & ".in", IO.Pipes.PipeDirection.In),
+            New IO.Pipes.NamedPipeServerStream(pipeName & ".out", IO.Pipes.PipeDirection.Out)
+        )
+        Dim si As New ProcessStartInfo With {
+            .Arguments = pipeName,
+            .FileName = IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Taas.HostProcess.exe")
+        }
+        If options.ExecuteWithoutShell Then
+            si.CreateNoWindow = True
+            si.UseShellExecute = False
+        End If
+        Me._proc = New Process() With {.StartInfo = si}
+        Me._proc.Start()
+        Me._thread.Start()
+        Me._lock.WaitOne()
+        If Not Me.State = TaskState.Failed Then Me._change_state(TaskState.Initialized)
     End Sub
 
     Public Sub Execute()
         Select Case Me.State
             Case TaskState.Initialized
-                Me._thread.Start()
-                Me._lock.WaitOne()
+                'TODO: Make this timeout enabled
+                Me._pipe_handler.SendMessage(TaskPipeProtocol.BuildStringCommand(TaskPipeProtocol.Library, Me._options.Library))
+                Me._pipe_handler.SendMessage(TaskPipeProtocol.BuildStringCommand(TaskPipeProtocol.ClassInfo, Me._options.ClassName))
+                Me._pipe_handler.SendMessage({TaskPipeProtocol.Execute})
+                Me._change_state(TaskState.Running)
             Case TaskState.Paused
-                Me.RuntimeResume()
+                'TODO: Resume Process
+                'TODO: Change state
             Case TaskState.Running
             Case Else
                 Throw New InvalidOperationException("Unable to execute task runtime: The task is in an invalid state (" & Me.State.ToString & ").")
         End Select
     End Sub
 
-    <CodeAnalysis.SuppressMessage("System.Obsolete", "BC40000")> Protected Overridable Sub RuntimeResume()
-        Me._thread.Resume()
-        Me._change_state(TaskState.Running)
-    End Sub
-
     Public Sub Abort()
         If Me.State = TaskState.Aborted Then Exit Sub
         If Not (Me.State = TaskState.Running Or Me.State = TaskState.Paused) Then _
             Throw New InvalidOperationException("Unable to abort task runtime: The task is in an invalid state (" & Me.State.ToString & ").")
-        Me.RuntimeAbort()
-    End Sub
-
-    Protected Overridable Sub RuntimeAbort()
-        Me._thread.Abort()
-        Me._lock.WaitOne()
+        Me._is_killing = True
+        Me._proc.Kill()
     End Sub
 
     Public Sub Pause()
         If Me.State = TaskState.Paused Then Exit Sub
         If Not Me.State = TaskState.Running Then _
             Throw New InvalidOperationException("Unable to pause task runtime: The task is in an invalid state (" & Me.State.ToString & ").")
-        Me.RuntimePause()
-    End Sub
-
-    <CodeAnalysis.SuppressMessage("System.Obsolete", "BC40000")> Protected Overridable Sub RuntimePause()
-        Me._thread.Suspend()
-        Me._change_state(TaskState.Paused)
+        'TODO: Suspend process
+        'TODO: Change state
     End Sub
 
     Private Sub _loop_internal()
         Try
+            DirectCast(Me._pipe_handler.PipeIn, IO.Pipes.NamedPipeServerStream).WaitForConnection()
+            DirectCast(Me._pipe_handler.PipeOut, IO.Pipes.NamedPipeServerStream).WaitForConnection()
+            Me._pipe_handler.PipeOut.WriteByte(TaskPipeProtocol.HandShake)
+            Me._pipe_handler.PipeOut.Flush()
+            If Not Me._pipe_handler.PipeIn.ReadByte() = TaskPipeProtocol.HandShake Then
+                Me._lock.Release()
+                Me._change_state(TaskState.Failed)
+                'TODO: send an exception and kill HostProcess
+                Exit Sub
+            End If
             Me._lock.Release()
-            Me._change_state(TaskState.Running)
-            Me.Runtime()
-            Me._change_state(TaskState.Finished)
+            Me._pipe_handler.Run()
+            Me._pipe_handler.PipeIn.Close()
+            Me._pipe_handler.PipeOut.Close()
+            Me._proc.WaitForExit()
+            If Me._is_killing Then
+                Me._change_state(TaskState.Aborted)
+            Else
+                Me._change_state(TaskState.Finished)
+            End If
         Catch thex As Threading.ThreadAbortException
-            Me._lock.Release()
-            Me._change_state(TaskState.Aborted)
         Catch ex As Exception
-            Me._current_state = TaskState.Failed
-            RaiseEvent StateChange(Me, New TaskExceptionEventArgs(ex))
+            'TODO: set state
+            'TODO: kill process
+            'TODO: transmit error
         End Try
     End Sub
 
-    Protected MustOverride Sub Runtime()
-
     Public NotOverridable Overrides Function Equals(obj As Object) As Boolean
         Dim retval As Boolean = False
-        If GetType(Task).IsAssignableFrom(obj.GetType) Then
+        If GetType(TaskServer).IsAssignableFrom(obj.GetType) Then
             retval = Me._IEquatable_Equals(obj)
         Else
             retval = MyBase.Equals(obj)
@@ -123,7 +148,7 @@ Public MustInherit Class Task : Implements IDisposable, IEquatable(Of Task)
         Return retval
     End Function
 
-    Private Function _IEquatable_Equals(other As Task) As Boolean Implements IEquatable(Of Task).Equals
+    Private Function _IEquatable_Equals(other As TaskServer) As Boolean Implements IEquatable(Of TaskServer).Equals
         Return Me.ID.Equals(other.ID)
     End Function
 
@@ -138,29 +163,20 @@ Public MustInherit Class Task : Implements IDisposable, IEquatable(Of Task)
     Protected Sub Dispose(disposing As Boolean)
         If Not Me._is_disposed Then
             If disposing Then
-                Me.CleanUp()
+                'TODO: kill host process and stop thread
                 Me._change_state(TaskState.Disposed)
                 RemoveHandler Me.StateChange, AddressOf Me._engine.TaskEventSink
             End If
-            Me.CleanUpUnmanaged()
         End If
         Me._is_disposed = True
     End Sub
 
-    Protected NotOverridable Overrides Sub Finalize()
-        Dispose(False)
-        MyBase.Finalize()
-    End Sub
-
     Public Sub Dispose() Implements IDisposable.Dispose
         Dispose(True)
-        GC.SuppressFinalize(Me)
     End Sub
 
-    Protected Overridable Sub CleanUp()
-    End Sub
-
-    Protected Overridable Sub CleanUpUnmanaged()
+    Private Sub _pipe_handler_PipeData(sender As Object, e As TaskPipeDataEventArgs) Handles _pipe_handler.PipeData
+        'TODO: Filter and transmit error messages from the process
     End Sub
 
 End Class
