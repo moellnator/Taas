@@ -77,6 +77,7 @@
     <Import Include="Microsoft.VisualStudio.TestTools.UnitTesting" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="CommonTest.vb" />
     <Compile Include="EngineTest.vb" />
     <Compile Include="My Project\AssemblyInfo.vb" />
     <Compile Include="My Project\Application.Designer.vb">
@@ -115,6 +116,10 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\Taas.Common\Taas.Common.vbproj">
+      <Project>{6b653679-1e0a-40f8-98d4-901a99123e69}</Project>
+      <Name>Taas.Common</Name>
+    </ProjectReference>
     <ProjectReference Include="..\Taas.ProcessHost\Taas.HostProcess.vbproj">
       <Project>{5333e521-e0fa-483a-8737-6d9280cf2200}</Project>
       <Name>Taas.HostProcess</Name>

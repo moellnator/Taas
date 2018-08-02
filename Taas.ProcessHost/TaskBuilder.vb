@@ -4,6 +4,18 @@
     Private _type As Type
     Private _instance As TaskPayload
 
+    Public ReadOnly Property Assembly As Reflection.Assembly
+        Get
+            Return Me._asm
+        End Get
+    End Property
+
+    Public ReadOnly Property InstanceType As Type
+        Get
+            Return Me._type
+        End Get
+    End Property
+
     Public Sub SetLibrary(library As String)
         Me._asm = Reflection.Assembly.LoadFrom(library)
     End Sub

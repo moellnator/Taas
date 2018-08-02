@@ -64,9 +64,6 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="TaskEngine.vb" />
-    <Compile Include="TaskPipe.vb" />
-    <Compile Include="TaskPipeEvent.vb" />
-    <Compile Include="TaskPipeProtocol.vb" />
     <Compile Include="TaskServer.vb" />
     <Compile Include="My Project\AssemblyInfo.vb" />
     <Compile Include="My Project\Application.Designer.vb">
@@ -104,6 +101,12 @@
       <CustomToolNamespace>My</CustomToolNamespace>
       <LastGenOutput>Settings.Designer.vb</LastGenOutput>
     </None>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Taas.Common\Taas.Common.vbproj">
+      <Project>{6b653679-1e0a-40f8-98d4-901a99123e69}</Project>
+      <Name>Taas.Common</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.VisualBasic.targets" />
 </Project>

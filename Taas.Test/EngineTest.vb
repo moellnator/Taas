@@ -3,6 +3,15 @@ Imports Taas.HostProcess
 
 <TestClass()> Public Class EngineTest
 
+    Public Class MockTask : Inherits TaskPayload
+
+        Public Overrides Sub Execute()
+            Common.Logging.Logger.Warning("++++++ TASK EXECUTION +++++++")
+            Threading.Thread.Sleep(1000)
+        End Sub
+
+    End Class
+
     <TestMethod(), TestCategory("MockUpTask")> Public Sub Execute()
         Dim e As New TestEngine
         Dim o As New TaskOptions("Taas.Test.dll", "Taas.Test.EngineTest+MockTask") With {
@@ -10,23 +19,15 @@ Imports Taas.HostProcess
         }
         Using t As New TaskServer
             t.Initialize(e, o)
+            Assert.AreEqual(TaskState.Initializing, t.State)
+            AwaitTaskState(t, TaskState.Initialized)
             Assert.AreEqual(e.Tasks.Count, 1)
-            Assert.AreEqual(e.Tasks.First.State, TaskState.Initialized)
             t.Execute()
-            Assert.AreEqual(e.Tasks.First.State, TaskState.Running)
-            AwaitTask(t, 5000)
-            Assert.AreEqual(e.Tasks.First.State, TaskState.Finished)
+            Assert.AreEqual(TaskState.Executing, e.Tasks.First.State)
+            AwaitTaskState(t, TaskState.Finished, 5000)
         End Using
-        Assert.AreEqual(e.Tasks.First.State, TaskState.Disposed)
+        Assert.AreEqual(TaskState.Disposed, e.Tasks.First.State)
     End Sub
-
-    Public Class MockTask : Inherits TaskPayload
-
-        Public Overrides Sub Execute()
-            Console.WriteLine("Executed")
-        End Sub
-
-    End Class
 
     <TestMethod(), TestCategory("MockUpTask")> Public Sub Abort()
         Dim e As New TestEngine
@@ -35,32 +36,19 @@ Imports Taas.HostProcess
         }
         Using t As New TaskServer
             t.Initialize(e, o)
+            AwaitTaskState(t, TaskState.Initialized)
             t.Execute()
             t.Abort()
-            AwaitTask(t, 1000)
-            Assert.AreEqual(e.Tasks.First.State, TaskState.Aborted)
+            Assert.AreEqual(TaskState.Aborting, e.Tasks.First.State)
+            AwaitTaskState(t, TaskState.Aborted, 5000)
         End Using
-        Assert.AreEqual(e.Tasks.First.State, TaskState.Disposed)
+        Assert.AreEqual(TaskState.Disposed, e.Tasks.First.State)
     End Sub
 
-    '<TestMethod(), TestCategory("MockUpTask")> Public Sub Pause()
-    '    Dim e As New TestEngine
-    '    Using t As New TaskServer
-    '        t.Initialize(e, TaskOptions.Empty)
-    '        t.Execute()
-    '        t.Pause()
-    '        Assert.AreEqual(e.Tasks.First.State, TaskState.Paused)
-    '        t.Execute()
-    '        AwaitTask(t, 1000)
-    '        Assert.AreEqual(e.Tasks.First.State, TaskState.Finished)
-    '    End Using
-    '    Assert.AreEqual(e.Tasks.First.State, TaskState.Disposed)
-    'End Sub
-
-    Private Sub AwaitTask(task As TaskServer, timeOut As Double)
+    Private Sub AwaitTaskState(task As TaskServer, state As TaskState, Optional timeOut As Double = 1000)
         Dim stopWatch As New Stopwatch
         stopWatch.Start()
-        While task.State = TaskState.Running
+        While Not task.State = state
             Threading.Thread.Sleep(1)
             If stopWatch.ElapsedMilliseconds >= timeOut Then Assert.Fail("Waiting for task has timed out (" & stopWatch.ElapsedTicks & ").")
         End While
