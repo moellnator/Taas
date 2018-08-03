@@ -12,13 +12,12 @@
 
         Private Shared ReadOnly _queue_mutex As New Threading.Mutex
         Private Shared ReadOnly _message_queue As New List(Of Entry)
-        Private Shared ReadOnly _devices As New List(Of IDevice)
+        Private Shared ReadOnly _devices As New List(Of Device)
         Private Shared ReadOnly _runtime As New Threading.Thread(AddressOf _loop)
         Private Shared _is_exit As Boolean = False
 
-        Public Shared Sub AddDevice(device As IDevice)
-            _devices.Add(device)
-            AddHandler AppDomain.CurrentDomain.ProcessExit, AddressOf _exit
+        Public Shared Sub AddDevice(device As Device)
+            If Not _devices.Contains(device) Then _devices.Add(device)
         End Sub
 
         Private Shared Sub _exit()
@@ -27,6 +26,7 @@
 
         Shared Sub New()
             _runtime.Start()
+            AddHandler AppDomain.CurrentDomain.ProcessExit, AddressOf _exit
         End Sub
 
         Public Shared Property Verbosity As Level = Level.Warning
@@ -52,19 +52,33 @@
         End Sub
 
         Private Shared Sub _loop()
-            While Not _is_exit
-                If _message_queue.Count > 0 Then
-                    _queue_mutex.WaitOne()
-                    Dim entry As Entry = _message_queue.OrderBy(Function(e) e.TimeStamp).First
-                    _message_queue.Remove(entry)
-                    _queue_mutex.ReleaseMutex()
-                    For Each d As IDevice In _devices
-                        d.AddEntry(entry)
-                    Next
-                Else
-                    Threading.Thread.Sleep(1)
-                End If
-            End While
+            Try
+                While Not _is_exit
+                    If _message_queue.Count > 0 Then
+                        _queue_mutex.WaitOne()
+                        Dim entry As Entry = _message_queue.OrderBy(Function(e) e.TimeStamp).First
+                        _message_queue.Remove(entry)
+                        _queue_mutex.ReleaseMutex()
+                        For Each d As Device In _devices
+                            d.AddEntry(entry)
+                        Next
+                    Else
+                        Threading.Thread.Sleep(1)
+                    End If
+                End While
+            Catch thex As Threading.ThreadAbortException
+                AwaitQueueDrained()
+            End Try
+        End Sub
+
+        Public Shared Sub AwaitQueueDrained()
+            _queue_mutex.WaitOne()
+            For Each ent As Entry In _message_queue.OrderBy(Function(e) e.TimeStamp)
+                For Each d As Device In _devices
+                    d.AddEntry(ent)
+                Next
+            Next
+            _queue_mutex.ReleaseMutex()
         End Sub
 
         Private Shared Sub _queue_message(level As Level, message As String)

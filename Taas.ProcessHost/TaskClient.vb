@@ -80,7 +80,7 @@ Public Class TaskClient
     Private Sub _handle_exception(ex As Exception)
         Try
             Logger.Exception(ex.Message & vbNewLine & ex.StackTrace)
-            Dim exdata As String = "[" & ex.GetType.Name & "]" & ex.Message & "; " & ex.StackTrace
+            Dim exdata As String = "[" & ex.GetType.Name & "] " & ex.Message & "; " & ex.StackTrace
             Me._pipe_handler.SendMessageSafe(Protocol.BuildStringCommand(Protocol.Critial, exdata))
             Me._pipe_loop.Abort()
         Catch

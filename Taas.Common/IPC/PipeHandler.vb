@@ -89,6 +89,11 @@ Namespace IPC
             Return retval
         End Function
 
+        Public Sub Close()
+            Me.PipeIn.Close()
+            Me.PipeOut.Close()
+        End Sub
+
     End Class
 
 End Namespace

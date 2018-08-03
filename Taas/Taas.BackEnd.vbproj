@@ -63,6 +63,10 @@
     <Import Include="System.Threading.Tasks" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="API\APIProviderHost.vb" />
+    <Compile Include="API\IProvider.vb" />
+    <Compile Include="API\WinApiProvider.vb" />
+    <Compile Include="TaskClientException.vb" />
     <Compile Include="TaskEngine.vb" />
     <Compile Include="TaskServer.vb" />
     <Compile Include="My Project\AssemblyInfo.vb" />

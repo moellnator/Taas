@@ -1,20 +1,13 @@
 ﻿Namespace Logging
     Public Class Entry : Implements IEquatable(Of Entry)
 
-        Private Shared _ID_GLOBAL As Integer = 0
-        Private Shared Function _ID_NEXT() As Integer
-            Dim retval As Integer = _ID_GLOBAL
-            _ID_GLOBAL += 1
-            Return retval
-        End Function
-
         Private ReadOnly _id As Integer
         Public ReadOnly Property Level As Level
         Public ReadOnly Property Message As String
         Public ReadOnly Property TimeStamp As DateTime
 
         Public Sub New(level As Level, message As String)
-            Me._id = _ID_NEXT()
+            Me._id = Utility.IdentificationGenerator.GetNext(Of Entry)
             Me.Level = level
             Me.Message = message
             Me.TimeStamp = DateTime.Now

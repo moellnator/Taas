@@ -64,7 +64,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Logging\ConsoleDevice.vb" />
-    <Compile Include="Logging\IDevice.vb" />
+    <Compile Include="Logging\Device.vb" />
     <Compile Include="Logging\Logger.vb" />
     <Compile Include="Logging\Entry.vb" />
     <Compile Include="My Project\AssemblyInfo.vb" />
@@ -85,6 +85,7 @@
     <Compile Include="IPC\PipeHandler.vb" />
     <Compile Include="IPC\PipeDataEvent.vb" />
     <Compile Include="IPC\Protocol.vb" />
+    <Compile Include="Utility\IdentificationGenerator.vb" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="My Project\Resources.resx">

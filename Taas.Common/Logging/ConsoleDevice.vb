@@ -1,5 +1,5 @@
 ﻿Namespace Logging
-    Public Class ConsoleDevice : Implements IDevice
+    Public Class ConsoleDevice : Inherits Device
 
         Private Shared ReadOnly _COLORS As ConsoleColor() = {
             ConsoleColor.Red,
@@ -25,7 +25,7 @@
         Private Sub New()
         End Sub
 
-        Public Sub AddEntry(entry As Entry) Implements IDevice.AddEntry
+        Public Overrides Sub AddEntry(entry As Entry)
             Console.ForegroundColor = ConsoleColor.Gray
             Console.Write(entry.TimeStamp.ToLongTimeString & "  ")
             Console.ForegroundColor = _COLORS(entry.Level)

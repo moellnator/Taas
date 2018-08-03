@@ -1,4 +1,5 @@
 ﻿Imports Taas.BackEnd
+Imports Taas.Common.Logging
 Imports Taas.HostProcess
 
 <TestClass()> Public Class EngineTest
@@ -6,8 +7,17 @@ Imports Taas.HostProcess
     Public Class MockTask : Inherits TaskPayload
 
         Public Overrides Sub Execute()
-            Common.Logging.Logger.Warning("++++++ TASK EXECUTION +++++++")
+            Logger.Warning("++++++ TASK EXECUTION +++++++")
             Threading.Thread.Sleep(1000)
+        End Sub
+
+    End Class
+
+    Public Class FailTask : Inherits TaskPayload
+
+        Public Overrides Sub Execute()
+            Logger.Warning("++++++ TASK EXECUTION +++++++")
+            Throw New Exception("This is a test.")
         End Sub
 
     End Class
@@ -17,6 +27,8 @@ Imports Taas.HostProcess
         Dim o As New TaskOptions("Taas.Test.dll", "Taas.Test.EngineTest+MockTask") With {
             .ExecuteWithoutShell = False
         }
+        Logger.AddDevice(CommonTest.TraceLogDevice.GetInstance)
+        Logger.Verbosity = Level.Debug
         Using t As New TaskServer
             t.Initialize(e, o)
             Assert.AreEqual(TaskState.Initializing, t.State)
@@ -27,6 +39,26 @@ Imports Taas.HostProcess
             AwaitTaskState(t, TaskState.Finished, 5000)
         End Using
         Assert.AreEqual(TaskState.Disposed, e.Tasks.First.State)
+        Logger.AwaitQueueDrained()
+    End Sub
+
+    <TestMethod(), TestCategory("MockUpTask")> Public Sub Fail()
+        Dim e As New TestEngine
+        Dim o As New TaskOptions("Taas.Test.dll", "Taas.Test.EngineTest+FailTask") With {
+            .ExecuteWithoutShell = False
+        }
+        Logger.AddDevice(CommonTest.TraceLogDevice.GetInstance)
+        Logger.Verbosity = Level.Debug
+        Using t As New TaskServer
+            t.Initialize(e, o)
+            AwaitTaskState(t, TaskState.Initialized)
+            t.Execute()
+            Assert.AreEqual(TaskState.Executing, e.Tasks.First.State)
+            AwaitTaskState(t, TaskState.Failed, 5000)
+            Assert.AreEqual(t.LastException.Message, "[Exception] This is a test.")
+        End Using
+        Assert.AreEqual(TaskState.Disposed, e.Tasks.First.State)
+        Logger.AwaitQueueDrained()
     End Sub
 
     <TestMethod(), TestCategory("MockUpTask")> Public Sub Abort()
@@ -34,6 +66,8 @@ Imports Taas.HostProcess
         Dim o As New TaskOptions("Taas.Test.dll", "Taas.Test.EngineTest+MockTask") With {
             .ExecuteWithoutShell = False
         }
+        Logger.AddDevice(CommonTest.TraceLogDevice.GetInstance)
+        Logger.Verbosity = Level.Debug
         Using t As New TaskServer
             t.Initialize(e, o)
             AwaitTaskState(t, TaskState.Initialized)
@@ -43,6 +77,29 @@ Imports Taas.HostProcess
             AwaitTaskState(t, TaskState.Aborted, 5000)
         End Using
         Assert.AreEqual(TaskState.Disposed, e.Tasks.First.State)
+        Logger.AwaitQueueDrained()
+    End Sub
+
+    <TestMethod(), TestCategory("MockUpTask")> Public Sub Pause()
+        Dim e As New TestEngine
+        Dim o As New TaskOptions("Taas.Test.dll", "Taas.Test.EngineTest+MockTask") With {
+            .ExecuteWithoutShell = False
+        }
+        Logger.AddDevice(CommonTest.TraceLogDevice.GetInstance)
+        Logger.Verbosity = Level.Debug
+        Using t As New TaskServer
+            t.Initialize(e, o)
+            AwaitTaskState(t, TaskState.Initialized)
+            t.Execute()
+            Assert.AreEqual(TaskState.Executing, e.Tasks.First.State)
+            t.Pause()
+            Assert.AreEqual(TaskState.Paused, e.Tasks.First.State)
+            t.Execute()
+            Assert.AreEqual(TaskState.Executing, e.Tasks.First.State)
+            AwaitTaskState(t, TaskState.Finished, 5000)
+        End Using
+        Assert.AreEqual(TaskState.Disposed, e.Tasks.First.State)
+        Logger.AwaitQueueDrained()
     End Sub
 
     Private Sub AwaitTaskState(task As TaskServer, state As TaskState, Optional timeOut As Double = 1000)
@@ -64,18 +121,10 @@ Imports Taas.HostProcess
             End Get
         End Property
 
-        Private _last_error As Exception = Nothing
-        Public ReadOnly Property LastError As Exception
-            Get
-                Return _last_error
-            End Get
-        End Property
-
         Public Overrides Sub TaskEventSink(sender As Object, e As TaskEventArgs)
             If Not Me._tasks.Contains(sender) Then
                 Me._tasks.Add(sender)
             End If
-
         End Sub
 
     End Class

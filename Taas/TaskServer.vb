@@ -2,6 +2,7 @@
 Imports Taas.BackEnd
 Imports Taas.Common
 Imports Taas.Common.IPC
+Imports Taas.Common.Logging
 
 Public Enum TaskState
     Invalid = -1
@@ -18,19 +19,19 @@ End Enum
 
 Public Class TaskServer : Implements IDisposable, IEquatable(Of TaskServer)
 
-    Private Shared _ID_GLOBAL As Integer = 0
-    Private Shared Function _ID_NEXT() As Integer
-        Dim retval As Integer = _ID_GLOBAL
-        _ID_GLOBAL += 1
-        Return retval
-    End Function
-
     Public Event StateChange As TaskEventHandler
 
     Public ReadOnly Property ID As Integer
+
     Public ReadOnly Property State As TaskState
         Get
             Return Me._current_state
+        End Get
+    End Property
+
+    Public ReadOnly Property LastException As Exception
+        Get
+            Return Me._exception
         End Get
     End Property
 
@@ -40,14 +41,17 @@ Public Class TaskServer : Implements IDisposable, IEquatable(Of TaskServer)
     Private _options As TaskOptions = Nothing
     Private WithEvents _pipe_handler As PipeHandler
     Private _proc As Process
+    Private _exception As Exception
     Private ReadOnly _thread As New Threading.Thread(AddressOf Me._loop_internal)
 
     Public Sub New()
-        Me.ID = _ID_NEXT()
+        Me.ID = Utility.IdentificationGenerator.GetNext(Of TaskServer)
+        Logger.Debug("Created task server [" & Me.ID & "].")
     End Sub
 
     Private Sub _change_state(newState As TaskState)
         Me._current_state = newState
+        Logger.Information("Task server [" & Me.ID & "] changed state to '" & Me._current_state.ToString & "'.")
         RaiseEvent StateChange(Me, New TaskEventArgs(newState))
     End Sub
 
@@ -69,6 +73,7 @@ Public Class TaskServer : Implements IDisposable, IEquatable(Of TaskServer)
                 New NamedPipeServerStream(pipeName & ".in", PipeDirection.In),
                 New NamedPipeServerStream(pipeName & ".out", PipeDirection.Out)
             )
+            Logger.Debug("Task server [" & Me.ID & "] created IPC pipes [" & pipeName & "].")
             Dim si As New ProcessStartInfo With {
                 .Arguments = pipeName,
                 .FileName = IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Taas.HostProcess.exe")
@@ -79,35 +84,33 @@ Public Class TaskServer : Implements IDisposable, IEquatable(Of TaskServer)
             End If
             Me._proc = New Process() With {.StartInfo = si}
             Me._proc.Start()
+            Logger.Debug("Task server [" & Me.ID & "] spwawned host process [" & Me._proc.Id & "].")
             Me._thread.Start()
         Catch ex As Exception
             Me._handle_exception(ex)
+            Throw New Exception("An exception occured during the initialization stage.", ex)
         End Try
     End Sub
 
     Public Sub Execute()
-        Try
-            Select Case Me.State
-                Case TaskState.Initialized
-                    Me._change_state(TaskState.Executing)
-                    Dim thr As New Threading.Thread(
-                         Sub()
-                             Try : Me._send_message(Protocol.Execute, "")
-                             Catch ex As Exception : Me._handle_exception(ex)
-                             End Try
-                         End Sub
-                    )
-                    thr.Start()
-                Case TaskState.Paused
-                'TODO: Resume Process
-                'TODO: Change state
-                Case TaskState.Executing
-                Case Else
-                    Throw New InvalidOperationException("Unable to execute task runtime: The task is in an invalid state (" & Me.State.ToString & ").")
-            End Select
-        Catch ex As Exception
-            Me._handle_exception(ex)
-        End Try
+        Select Case Me.State
+            Case TaskState.Initialized
+                Me._change_state(TaskState.Executing)
+                Dim thr As New Threading.Thread(
+                     Sub()
+                         Try : Me._send_message(Protocol.Execute, "")
+                         Catch ex As Exception : Me._handle_exception(ex)
+                         End Try
+                     End Sub
+                )
+                thr.Start()
+            Case TaskState.Paused
+                API.APIHost.CurrentProvider.ResumeProcess(Me._proc.Id)
+                Me._change_state(TaskState.Executing)
+            Case TaskState.Executing
+            Case Else
+                Throw New InvalidOperationException("Unable to execute task runtime: The task is in an invalid state (" & Me.State.ToString & ").")
+        End Select
     End Sub
 
     Public Sub Abort()
@@ -122,8 +125,8 @@ Public Class TaskServer : Implements IDisposable, IEquatable(Of TaskServer)
         If Me.State = TaskState.Paused Then Exit Sub
         If Not Me.State = TaskState.Executing Then _
             Throw New InvalidOperationException("Unable to pause task runtime: The task is in an invalid state (" & Me.State.ToString & ").")
-        'TODO: Suspend process
-        'TODO: Change state
+        API.APIHost.CurrentProvider.SuspendProcess(Me._proc.Id)
+        Me._change_state(TaskState.Paused)
     End Sub
 
     Private Sub _loop_internal()
@@ -134,13 +137,14 @@ Public Class TaskServer : Implements IDisposable, IEquatable(Of TaskServer)
             Me._pipe_handler.PipeOut.Flush()
             If Not Me._pipe_handler.PipeIn.ReadByte() = Protocol.HandShake Then _
                 Throw New Exception("Handshake with host process failed during initialization.")
+            Logger.Debug("Task server [" & Me.ID & "] IPC pipe handshake complete.")
             Me._send_message(Protocol.Library, Me._options.Library)
             Me._send_message(Protocol.ClassInfo, Me._options.ClassName)
             Me._change_state(TaskState.Initialized)
             Me._pipe_handler.Run()
-            Me._pipe_handler.PipeIn.Close()
-            Me._pipe_handler.PipeOut.Close()
+            Me._pipe_handler.Close()
             Me._proc.WaitForExit()
+            Logger.Debug("Task server [" & Me.ID & "] host process [" & Me._proc.Id & "] exited.")
             If Me._current_state = TaskState.Aborting Then
                 Me._change_state(TaskState.Aborted)
             Else
@@ -198,11 +202,38 @@ Public Class TaskServer : Implements IDisposable, IEquatable(Of TaskServer)
     End Sub
 
     Private Sub _pipe_handler_PipeData(sender As Object, e As PipeDataEventArgs) Handles _pipe_handler.PipeData
-        'TODO: Filter and transmit error messages from the process
+        Try
+            Select Case e.Data.First
+                Case Protocol.Critial
+                    Dim data As String = Protocol.GetStringArgument(e.Data)
+                    Throw New TaskClientException(data.Split(";").First, "@host process:" & vbNewLine & data.Split(";").Last)
+                Case Else
+                    Throw New Exception("Invalid token in IPC stream.")
+            End Select
+        Catch ex As Exception
+            Me._handle_exception(ex)
+        End Try
     End Sub
 
     Private Sub _handle_exception(ex As Exception)
-        'TODO: propper error handling
+        Dim exstring As New Text.StringBuilder
+        Dim currentex As Exception = ex
+        Do
+            exstring.Append(vbNewLine & "(" & ex.GetType.Name & ") " & currentex.Message & vbNewLine & currentex.StackTrace & vbNewLine)
+            currentex = currentex.InnerException
+        Loop While currentex IsNot Nothing
+        Logger.Critical("Task server [" & Me.ID & "] has experienced a critical exception.")
+        Logger.Exception("Task server [" & Me.ID & "]: " & exstring.ToString)
+        Me._exception = ex
+        Try
+            If Me._proc IsNot Nothing AndAlso Not Me._proc.HasExited Then
+                Me._proc.Kill()
+                Me._proc.WaitForExit()
+            End If
+            If Me._pipe_handler IsNot Nothing Then Me._pipe_handler.Close()
+            Me._thread.Abort()
+        Catch : End Try
+        Me._change_state(TaskState.Failed)
     End Sub
 
 End Class
